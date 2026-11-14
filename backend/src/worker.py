@@ -1,6 +1,7 @@
 import json,time,traceback
 from pathlib import Path
 from .config.database import Base,engine,SessionLocal
+from .config.migrate import ensure_schema
 from .models import AttributionRun,BudgetScenario,JourneyBatch
 from .constants.status import RunStatus
 from .services.run_service import queue
@@ -10,7 +11,7 @@ from .services.attribution_algorithm import analyze_attribution
 from .services.budget_algorithm import optimize_budget
 from .services.audit_service import log
 from .utils.fingerprint import fingerprint
-Base.metadata.create_all(engine);Path("/artifacts").mkdir(exist_ok=True)
+Base.metadata.create_all(engine);ensure_schema(engine);Path("/artifacts").mkdir(exist_ok=True)
 while True:
     Path("/artifacts/heartbeat").write_text(str(time.time()))
     job=queue.blpop("journey:jobs",timeout=2)

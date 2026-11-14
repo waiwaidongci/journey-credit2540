@@ -1,5 +1,6 @@
 import random,json
 from src.config.database import Base,engine,SessionLocal
+from src.config.migrate import ensure_schema
 from src.models import User,Channel,JourneyBatch,Journey,AttributionRun,BudgetScenario
 from src.utils.security import hash_password
 from src.utils.fingerprint import fingerprint
@@ -9,7 +10,7 @@ from src.services.attribution_algorithm import analyze_attribution
 from src.services.budget_algorithm import optimize_budget
 
 def seed():
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine);ensure_schema(engine)
     with SessionLocal() as db:
         for role,name in [("admin","陈照 · 传播负责人"),("analyst","许晴 · 路径研究员"),("viewer","闻溪 · 策展阅读者")]:
             email=role+"@xunguang.demo"

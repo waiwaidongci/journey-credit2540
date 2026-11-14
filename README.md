@@ -39,6 +39,18 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 seed以邮箱、渠道code、批次name、路径code和基准研究名查重；只补缺失，不覆盖已有路径备注。`SEED_DEMO=true`启动自动seed，失败记录日志而不阻塞服务。
 
+## 路径补传
+
+预约路径会补传、更正归属周或撤回。路径与渠道页提供补传入口（admin/analyst），提交JSON记录数组，每条含匿名编号`code`与来源修订号`revision`，撤回用`{"withdraw":true}`。规则：
+
+- 同一匿名编号按来源修订号取新；同一补传内重复编号只应用最高修订号。
+- 撤回登记墓碑行，旧版晚到不复活撤回路径；更高修订号可合法恢复。
+- 同版内容冲突（与已接收或批内同号同版不同内容）或记录无效时整批拒收，逐条给出原因；同版同内容重复送达幂等跳过。内容身份为撤回标记、归属批次、触点顺序与终点；备注是研究员本地标注，不参与冲突判定，也不被补传覆盖。
+- 跨周迁移与归因可见性在同一事务生效；导入是单事务，PostgreSQL下用咨询锁串行化并发补传。导入中断或两个补传交错时，研究只读到完整的导入前或导入后路径，不混版。
+- 撤回路径从批次列表、路径页与归因读取中移除；已有归因研究与预算情景保存结果快照，原值保留。
+
+接口为`POST /journeys/import`，返回`{applied, source, summary, records[]}`，页面列出各条接收或拒绝原因。`journeys`表新增`revision`/`withdrawn`列（`migrations/002_journey_revisions.sql`，启动时幂等补列）。
+
 1. 08:00 许晴以analyst登录，核对首周700条路径和6个渠道，保留循环顺序。
 2. 在路径页补一条匿名路径备注，确认NULL表示未转化观察终点。
 3. 创建“首周路径复核”，固定移除口径为指向被移除渠道的概率流量转NULL。
@@ -81,6 +93,7 @@ backend/src/{models,schemas,services,controllers,routes,middlewares,utils,consta
 backend/src/{main.py,worker.py}
 backend/scripts/seed_demo.py
 backend/migrations/001_initial.sql
+backend/tests/{conftest.py,test_journey_import.py}
 frontend/src/{api,stores,types,components,hooks,pages,router,utils,constants}
 ```
 
@@ -97,7 +110,7 @@ AttributionSummary跨首页/结果/情景共用，CreditBars跨首页/结果共�
 | JWT_SECRET | local-journey-credit-change-this-key | 本地演示值，部署前更换 |
 | SEED_DEMO | true | 启动自动seed |
 
-本地Python3.11安装requirements，设置DATABASE_URL/REDIS_URL；`cd backend && uvicorn src.main:app --reload`，另起`python -m src.worker`。前端`npm install && npm run dev`，本地为`/api`配置后端代理。标准演示以Compose为准。
+本地Python3.11安装requirements，设置DATABASE_URL/REDIS_URL；`cd backend && uvicorn src.main:app --reload`，另起`python -m src.worker`。前端`npm install && npm run dev`，本地为`/api`配置后端代理。标准演示以Compose为准。补传规则与并发一致性测试：`cd backend && python -m pytest tests/`（SQLite临时库，不依赖PostgreSQL/Redis）。
 
 ```bash
 docker compose down -v --remove-orphans
@@ -107,7 +120,7 @@ docker compose down -v --remove-orphans
 
 ## 已知边界
 
-合成冻结匿名路径，无上传或实际投放；仅可补备注，渠道配置当前只读。观察路径的一阶Markov及转NULL策略有偏差，未做因果识别、时间归因窗或高阶路径。LP无收益递减/协同/整数约束，不把指数解读为真实ROI。单worker无running自动恢复、事务outbox或分布式锁，中断需重提；登录限流仅进程内。首次建表不是完整迁移链；网络字体失效时回退。
+合成匿名路径，无实际投放；除补传入口外渠道配置当前只读。观察路径的一阶Markov及转NULL策略有偏差，未做因果识别、时间归因窗或高阶路径。LP无收益递减/协同/整数约束，不把指数解读为真实ROI。单worker无running自动恢复、事务outbox或分布式锁，中断需重提；登录限流仅进程内。首次建表不是完整迁移链；网络字体失效时回退。
 
 ## License
 

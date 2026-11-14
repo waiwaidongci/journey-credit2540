@@ -9,3 +9,5 @@ class Journey(Base):
     path:Mapped[list]=mapped_column(JSON)
     converted:Mapped[bool]
     note:Mapped[str]
+    revision:Mapped[int]=mapped_column(default=1)
+    withdrawn:Mapped[bool]=mapped_column(default=False)
